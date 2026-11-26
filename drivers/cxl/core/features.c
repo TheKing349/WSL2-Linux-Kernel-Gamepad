@@ -97,6 +97,7 @@ get_supported_features(struct cxl_features_state *cxlfs)
 		kvmalloc(struct_size(entries, ent, count), GFP_KERNEL);
 	if (!entries)
 		return NULL;
+	entries->num_features = count;
 
 	struct cxl_mbox_get_sup_feats_out *mbox_out __free(kvfree) =
 		kvmalloc(cxl_mbox->payload_size, GFP_KERNEL);
@@ -174,7 +175,6 @@ get_supported_features(struct cxl_features_state *cxlfs)
 		start += num_entries;
 	} while (remain_feats);
 
-	entries->num_features = count;
 	entries->num_user_features = user_feats;
 
 	return no_free_ptr(entries);
@@ -239,6 +239,8 @@ size_t cxl_get_feature(struct cxl_mailbox *cxl_mbox, const uuid_t *feat_uuid,
 
 	uuid_copy(&pi.uuid, feat_uuid);
 	pi.selection = selection;
+
+	guard(mutex)(&cxl_mbox->feat_mutex);
 	do {
 		data_to_rd_size = min(feat_out_size - data_rcvd_size,
 				      cxl_mbox->payload_size);
@@ -313,6 +315,7 @@ int cxl_set_feature(struct cxl_mailbox *cxl_mbox,
 		data_in_size = cxl_mbox->payload_size - hdr_size;
 	}
 
+	guard(mutex)(&cxl_mbox->feat_mutex);
 	do {
 		int rc;
 
